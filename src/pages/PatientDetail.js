@@ -646,7 +646,7 @@ function PatientDetail() {
                             <ResponsiveContainer width="100%" height={260}>
                                 <ComposedChart
                                     data={watchSeries}
-                                    margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+                                    margin={{ top: 10, right: 20, left: 0, bottom: 30 }}
                                 >
                                     <CartesianGrid stroke="#E0E0E0" strokeDasharray="3 3" />
                                     <XAxis dataKey="dateLabel" />
@@ -681,7 +681,7 @@ function PatientDetail() {
                                         yAxisId="left"
                                         dataKey="steps"
                                         name="Steps"
-                                        fill="#66BB6A"
+                                        fill="#8dba8fff"
                                         radius={[3, 3, 0, 0]}
                                     />
 
@@ -691,7 +691,7 @@ function PatientDetail() {
                                         type="monotone"
                                         dataKey="sleep_hours"
                                         name="Sleep (hrs)"
-                                        stroke="#42A5F5"
+                                        stroke="#0f29eaff"
                                         strokeWidth={3}
                                         dot={false}
                                     />
