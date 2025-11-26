@@ -325,15 +325,39 @@ function PatientDetail() {
             ).toFixed(1)
             : null;
 
+    // const avgRestingHR =
+    //     watchSeries.length > 0
+    //         ? Math.round(
+    //             watchSeries.reduce(
+    //                 (s, d) => s + (d.resting_heart_rate ?? 0),
+    //                 0
+    //             ) / watchSeries.length
+    //         )
+    //         : null;
     const avgRestingHR =
         watchSeries.length > 0
-            ? Math.round(
-                watchSeries.reduce(
-                    (s, d) => s + (d.resting_heart_rate ?? 0),
-                    0
-                ) / watchSeries.length
-            )
+            ? (() => {
+                let sum = 0;
+                let count = 0;
+
+                watchSeries.forEach((d) => {
+                    // use the same key as the chart
+                    const raw = d.resting_hr ?? d.resting_heart_rate;
+                    if (raw == null) return;
+
+                    const value =
+                        typeof raw === "string" ? parseFloat(raw) : raw;
+
+                    if (typeof value === "number" && !Number.isNaN(value)) {
+                        sum += value;
+                        count += 1;
+                    }
+                });
+
+                return count > 0 ? Math.round(sum / count) : null;
+            })()
             : null;
+
 
     const { bg: riskBg, color: riskColor } = getRiskChipStyles(risk.label);
 
@@ -528,8 +552,6 @@ function PatientDetail() {
                     )}
                 </Paper>
 
-
-                {/* Symptoms */}
                 {/* Symptoms */}
                 <Paper
                     elevation={0}
@@ -573,8 +595,6 @@ function PatientDetail() {
                     )}
                 </Paper>
 
-
-                {/* Apple Health */}
                 {/* Apple Health – combined trends */}
                 <Paper
                     elevation={0}
