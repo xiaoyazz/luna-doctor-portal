@@ -262,6 +262,8 @@ function PatientDetail() {
     if (!patient) return <Box sx={{ mt: 4 }}>No data</Box>;
 
     const { profile, metrics, risk } = patient;
+    console.log("PATIENT DETAIL DATA:", patient);
+    console.log("RISK FIELD:", patient.risk);
 
     const rawMoodSeries = metrics?.moodSeries || [];
     const rawSymptomSeries = metrics?.symptomSeries || [];
