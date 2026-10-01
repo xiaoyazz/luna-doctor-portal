@@ -1,6 +1,6 @@
 // src/api.js
-const API_BASE = "https://us-central1-fir-example-bd842.cloudfunctions.net/api";
-
+const API_BASE =
+    "http://127.0.0.1:5001/lunacare-d181e/us-central1/api"; // use this emulator URL for local development because firebase functions deployment uses pay as-you-go plan and can be expensive for testing. For production, use the deployed URL.
 // GET /users  -> list for dashboard
 export async function fetchUsers() {
     const res = await fetch(`${API_BASE}/users`);
