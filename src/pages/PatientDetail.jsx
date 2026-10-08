@@ -25,7 +25,13 @@ import {
     Legend,
     ComposedChart,
 } from "recharts";
-import { fetchUserDetail } from "../api";
+import {
+    fetchUserDetail,
+    fetchDoctorNotes,
+    createDoctorNote,
+    updateDoctorNote,
+    deleteDoctorNote,
+} from "../api";
 
 // ---------- helpers ---------------------------------------------------------
 const formatDecimal = (value, digits = 1) => {
@@ -85,15 +91,6 @@ const getSymptomAverage = (d) => {
 
     return nums.reduce((s, v) => s + v, 0) / nums.length;
 };
-// total “symptom load” (sum instead of avg)
-const getSymptomLoad = (d) => {
-    const values = d.values || {};
-    const nums = Object.values(values).filter(
-        (v) => typeof v === "number" && !Number.isNaN(v)
-    );
-    if (!nums.length) return 0;
-    return nums.reduce((s, v) => s + v, 0);
-};
 
 // ---------- component -------------------------------------------------------
 
@@ -105,12 +102,15 @@ function PatientDetail() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [medicalNote, setMedicalNote] = useState("");
-    const [notesByPatient, setNotesByPatient] = useState({});
+    const [doctorNotes, setDoctorNotes] = useState([]);
+    const [notesLoading, setNotesLoading] = useState(true);
+    const [notesError, setNotesError] = useState(null);
 
-    const patientNotes = notesByPatient[id] || [];
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [editingText, setEditingText] = useState("");
 
     useEffect(() => {
-        async function load() {
+        async function loadPatient() {
             try {
                 const data = await fetchUserDetail(id);
                 setPatient(data);
@@ -121,7 +121,21 @@ function PatientDetail() {
                 setLoading(false);
             }
         }
-        load();
+
+        async function loadNotes() {
+            try {
+                const notes = await fetchDoctorNotes(id);
+                setDoctorNotes(notes);
+            } catch (err) {
+                console.error(err);
+                setNotesError("Failed to load clinical notes");
+            } finally {
+                setNotesLoading(false);
+            }
+        }
+
+        loadPatient();
+        loadNotes();
     }, [id]);
 
     if (loading) {
@@ -225,14 +239,6 @@ function PatientDetail() {
             ? watchSeries[watchSeries.length - 1].dateLabel
             : "N/A";
 
-    const avgSteps =
-        watchSeries.length > 0
-            ? Math.round(
-                watchSeries.reduce((s, d) => s + (d.steps ?? 0), 0) /
-                watchSeries.length
-            )
-            : null;
-
     const validSleepValues = watchSeries
         .map((d) => d.sleep_hours)
         .filter(
@@ -251,32 +257,7 @@ function PatientDetail() {
             ).toFixed(1)
             : null;
 
-    const avgRestingHR =
-        watchSeries.length > 0
-            ? (() => {
-                let sum = 0;
-                let count = 0;
-                watchSeries.forEach((d) => {
-                    const raw = d.resting_hr ?? d.resting_heart_rate;
-                    if (raw == null) return;
-                    const value =
-                        typeof raw === "string" ? parseFloat(raw) : raw;
-                    if (typeof value === "number" && !Number.isNaN(value)) {
-                        sum += value;
-                        count += 1;
-                    }
-                });
-                return count > 0 ? Math.round(sum / count) : null;
-            })()
-            : null;
-
     // ---------- combine mood + steps + sleep -----
-
-    const combinedLength = Math.max(
-        moodSeries.length,
-        watchSeries.length,
-        symptomSeries.length
-    );
 
     const clinicalData = watchSeries.map((w) => {
         const totalSleep = w.sleep_hours ?? null;
@@ -344,35 +325,113 @@ function PatientDetail() {
 
     // ---------- add doctor notes -----
 
-    const handleSaveNote = () => {
-        const note = medicalNote.trim();
+    const handleSaveNote = async () => {
+        const text = medicalNote.trim();
 
-        if (!note) {
+        if (!text) return;
+
+        try {
+            const newNote =
+                await createDoctorNote(id, text);
+
+            setDoctorNotes((current) => [
+                newNote,
+                ...current,
+            ]);
+
+            setMedicalNote("");
+        } catch (err) {
+            console.error(err);
+            setNotesError("Failed to save clinical note");
+        }
+    };
+
+    const handleStartEdit = (note) => {
+        setEditingNoteId(note.id);
+        setEditingText(note.text);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingNoteId(null);
+        setEditingText("");
+    };
+
+    const handleUpdateNote = async (noteId) => {
+        const text = editingText.trim();
+
+        if (!text) return;
+
+        try {
+            const updated =
+                await updateDoctorNote(
+                    id,
+                    noteId,
+                    text
+                );
+
+            setDoctorNotes((current) =>
+                current.map((note) =>
+                    note.id === noteId
+                        ? updated
+                        : note
+                )
+            );
+
+            setEditingNoteId(null);
+            setEditingText("");
+        } catch (err) {
+            console.error(err);
+            setNotesError("Failed to update clinical note");
+        }
+    };
+
+    const handleDeleteNote = async (noteId) => {
+        const confirmed = window.confirm(
+            "Are you sure you want to delete this clinical note?"
+        );
+
+        if (!confirmed) {
             return;
         }
 
-        const newNote = {
-            id: Date.now(),
-            text: note,
-            author: "Dr. Maya Chen",
-            createdAt: new Date(),
-        };
+        try {
+            await deleteDoctorNote(id, noteId);
 
-        setNotesByPatient((current) => ({
-            ...current,
-            [id]: [
-                newNote,
-                ...(current[id] || []),
-            ],
-        }));
-
-        setMedicalNote("");
+            setDoctorNotes((current) =>
+                current.filter(
+                    (note) => note.id !== noteId
+                )
+            );
+        } catch (err) {
+            console.error(err);
+            setNotesError("Failed to delete clinical note");
+        }
     };
 
     const formatNoteDateTime = (value) => {
         if (!value) return "";
 
+        const seconds =
+            value._seconds ??
+            value.seconds;
+
+        if (seconds != null) {
+            return new Date(
+                seconds * 1000
+            ).toLocaleString("en-CA", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+            });
+        }
+
         const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return "";
+        }
 
         return date.toLocaleString("en-CA", {
             year: "numeric",
@@ -382,6 +441,7 @@ function PatientDetail() {
             minute: "2-digit",
         });
     };
+
 
     // ------------------------------------------------------------------------
 
@@ -427,7 +487,7 @@ function PatientDetail() {
                             <div className="flex flex-wrap gap-4 text-sm text-slate-500">
                                 <span className="flex items-center">
                                     <Activity className="w-3.5 h-3.5 mr-1.5" />
-                                    {profile.is_pregnant
+                                    {profile.isPregnant
                                         ? "Pregnant"
                                         : "Postpartum / Monitoring"}
                                 </span>
@@ -909,30 +969,104 @@ function PatientDetail() {
                         Previous Notes
                     </h4>
 
-                    {patientNotes.length === 0 ? (
+                    {notesLoading ? (
+                        <p className="text-sm text-slate-500">
+                            Loading notes...
+                        </p>
+                    ) : notesError ? (
+                        <p className="text-sm text-red-600">
+                            {notesError}
+                        </p>
+                    ) : doctorNotes.length === 0 ? (
                         <p className="text-sm text-slate-500">
                             No clinical notes have been added for this patient.
                         </p>
                     ) : (
                         <div className="space-y-3">
-                            {patientNotes.map((note) => (
+                            {doctorNotes.map((note) => (
                                 <div
                                     key={note.id}
                                     className="rounded-xl bg-slate-50 border border-slate-200 p-4"
                                 >
-                                    <p className="text-sm text-slate-800 leading-6 whitespace-pre-wrap">
-                                        {note.text}
-                                    </p>
+                                    {editingNoteId === note.id ? (
+                                        <>
+                                            <textarea
+                                                value={editingText}
+                                                onChange={(e) =>
+                                                    setEditingText(
+                                                        e.target.value
+                                                    )
+                                                }
+                                                rows={3}
+                                                maxLength={1000}
+                                                className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                            />
 
-                                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                                        <span className="font-semibold text-slate-700">
-                                            {note.author}
-                                        </span>
+                                            <div className="mt-3 flex gap-2">
+                                                <button
+                                                    onClick={() =>
+                                                        handleUpdateNote(
+                                                            note.id
+                                                        )
+                                                    }
+                                                    className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold"
+                                                >
+                                                    Save
+                                                </button>
 
-                                        <span>
-                                            {formatNoteDateTime(note.createdAt)}
-                                        </span>
-                                    </div>
+                                                <button
+                                                    onClick={handleCancelEdit}
+                                                    className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm text-slate-800 leading-6 whitespace-pre-wrap">
+                                                {note.text}
+                                            </p>
+
+                                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                                                <div className="text-xs text-slate-500">
+                                                    <span className="font-semibold text-slate-700">
+                                                        {note.authorName}
+                                                    </span>
+
+                                                    <span className="ml-2">
+                                                        {formatNoteDateTime(
+                                                            note.createdAt
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() =>
+                                                            handleStartEdit(
+                                                                note
+                                                            )
+                                                        }
+                                                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                                                    >
+                                                        Edit
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() =>
+                                                            handleDeleteNote(
+                                                                note.id
+                                                            )
+                                                        }
+                                                        className="text-xs font-semibold text-red-600 hover:text-red-800"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -940,14 +1074,11 @@ function PatientDetail() {
                 </div>
 
                 {/* Prototype notice */}
-                <div className="mt-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-100">
-                    <p className="text-xs text-amber-800">
-                        <span className="font-semibold">
-                            Prototype:
-                        </span>{" "}
-                        Notes entered here are currently stored only in the
-                        frontend session and are not yet saved to the LunaCare
-                        cloud backend.
+                <div className="mt-5 px-4 py-3 rounded-lg bg-indigo-50 border border-indigo-100">
+                    <p className="text-xs text-indigo-800">
+                        Clinical notes are saved to the patient's LunaCare
+                        cloud record and are intended for authorized healthcare
+                        providers only.
                     </p>
                 </div>
             </div>
