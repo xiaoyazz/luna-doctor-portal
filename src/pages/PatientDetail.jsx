@@ -6,9 +6,9 @@ import {
     Clock,
     Brain,
     Activity,
-    AlertTriangle,
     Moon,
-    CheckCircle,
+    FileText,
+    Save,
 } from "lucide-react";
 import {
     LineChart,
@@ -104,6 +104,10 @@ function PatientDetail() {
     const [patient, setPatient] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [medicalNote, setMedicalNote] = useState("");
+    const [notesByPatient, setNotesByPatient] = useState({});
+
+    const patientNotes = notesByPatient[id] || [];
 
     useEffect(() => {
         async function load() {
@@ -337,6 +341,47 @@ function PatientDetail() {
             .reverse()
             .find((d) => d.deepSleep != null)
             ?.deepSleep ?? null;;
+
+    // ---------- add doctor notes -----
+
+    const handleSaveNote = () => {
+        const note = medicalNote.trim();
+
+        if (!note) {
+            return;
+        }
+
+        const newNote = {
+            id: Date.now(),
+            text: note,
+            author: "Dr. Maya Chen",
+            createdAt: new Date(),
+        };
+
+        setNotesByPatient((current) => ({
+            ...current,
+            [id]: [
+                newNote,
+                ...(current[id] || []),
+            ],
+        }));
+
+        setMedicalNote("");
+    };
+
+    const formatNoteDateTime = (value) => {
+        if (!value) return "";
+
+        const date = new Date(value);
+
+        return date.toLocaleString("en-CA", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    };
 
     // ------------------------------------------------------------------------
 
@@ -796,6 +841,114 @@ function PatientDetail() {
                             </AreaChart>
                         </ResponsiveContainer>
                     )}
+                </div>
+            </div>
+
+            {/* Clinical Notes */}
+            <div className="mt-8 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-indigo-600" />
+                            Clinical Notes
+                        </h3>
+
+                        <p className="text-sm text-slate-600 mt-1">
+                            Add observations or follow-up notes for this patient.
+                        </p>
+                    </div>
+
+                    <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
+                        Authorized providers only
+                    </span>
+                </div>
+
+                {/* Add note */}
+                <div>
+                    <label
+                        htmlFor="medical-note"
+                        className="block text-sm font-medium text-slate-700 mb-2"
+                    >
+                        New note
+                    </label>
+
+                    <span className="text-xs text-slate-500">
+                        Date and time will be recorded automatically
+                    </span>
+
+                    <textarea
+                        id="medical-note"
+                        value={medicalNote}
+                        onChange={(e) => setMedicalNote(e.target.value)}
+                        maxLength={1000}
+                        rows={4}
+                        placeholder="Enter a clinical note about this patient..."
+                        className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+
+                    <div className="mt-2 flex items-center justify-between">
+                        <p className="text-xs text-slate-500">
+                            {medicalNote.length} / 1000 characters
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={handleSaveNote}
+                            disabled={!medicalNote.trim()}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <Save className="w-4 h-4" />
+                            Save Note
+                        </button>
+                    </div>
+                </div>
+
+                {/* Previous notes */}
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                    <h4 className="text-sm font-semibold text-slate-900 mb-3">
+                        Previous Notes
+                    </h4>
+
+                    {patientNotes.length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                            No clinical notes have been added for this patient.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {patientNotes.map((note) => (
+                                <div
+                                    key={note.id}
+                                    className="rounded-xl bg-slate-50 border border-slate-200 p-4"
+                                >
+                                    <p className="text-sm text-slate-800 leading-6 whitespace-pre-wrap">
+                                        {note.text}
+                                    </p>
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                        <span className="font-semibold text-slate-700">
+                                            {note.author}
+                                        </span>
+
+                                        <span>
+                                            {formatNoteDateTime(note.createdAt)}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Prototype notice */}
+                <div className="mt-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-100">
+                    <p className="text-xs text-amber-800">
+                        <span className="font-semibold">
+                            Prototype:
+                        </span>{" "}
+                        Notes entered here are currently stored only in the
+                        frontend session and are not yet saved to the LunaCare
+                        cloud backend.
+                    </p>
                 </div>
             </div>
         </div>
