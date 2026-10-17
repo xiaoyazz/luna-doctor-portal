@@ -166,6 +166,9 @@ function PatientDetail() {
 
     const { profile, metrics, risk } = patient;
 
+    const modelVersion =
+        risk?.modelVersion ?? null;
+
     const riskPercent =
         typeof risk?.percent === "number"
             ? Math.round(risk.percent)
@@ -483,6 +486,11 @@ function PatientDetail() {
                                         ? `${riskPercent}% PPD Risk Score`
                                         : "Risk score unavailable"}
                                 </span>
+                                {modelVersion != null && (
+                                    <p className="text-xs text-indigo-600 mt-2 font-medium">
+                                        Model version: v{modelVersion}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-wrap gap-4 text-sm text-slate-500">
                                 <span className="flex items-center">
@@ -1030,9 +1038,9 @@ function PatientDetail() {
 
                                             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                                                 <div className="text-xs text-slate-500">
-                                                    <span className="font-semibold text-slate-700">
+                                                    {/* <span className="font-semibold text-slate-700">
                                                         {note.authorName}
-                                                    </span>
+                                                    </span> */}
 
                                                     <span className="ml-2">
                                                         {formatNoteDateTime(
