@@ -299,3 +299,117 @@ export async function deleteDoctorNote(
 
     return res.json();
 }
+
+// ======================================================
+// PPD Risk Prediction Review
+// ======================================================
+
+
+// ------------------------------------------------------
+// POST /users/:id/ppd-label/verify
+// POST /users/:id/ppd-label/reject
+//
+// Unlike the helpers above, errors thrown here carry
+// `status` and the parsed response body (`data`) so the
+// caller can handle 409 (prediction changed, includes
+// `currentRisk`) and 503 (ML service unavailable).
+// ------------------------------------------------------
+
+const PPD_LABEL_ERROR_MESSAGES = {
+    400: "The review could not be saved. Check the prediction and reason, then try again.",
+    403: "You do not have access to this patient.",
+    404: "Patient not found.",
+    409: "The risk prediction was updated since this page loaded. Please review the new prediction.",
+    503: "Risk prediction is unavailable, try again later.",
+};
+
+async function postPpdLabelAction(
+    userId,
+    action,
+    body
+) {
+    const headers =
+        await getAuthHeaders();
+
+    const res =
+        await fetch(
+            `${API_BASE}/users/${userId}/ppd-label/${action}`,
+            {
+                method: "POST",
+
+                headers,
+
+                body: JSON.stringify(body),
+            }
+        );
+
+    const data =
+        await res.json().catch(
+            () => ({})
+        );
+
+    if (!res.ok) {
+        // 503 always uses the fixed message so the doctor
+        // sees consistent wording for an ML outage.
+        const message =
+            res.status === 503
+                ? PPD_LABEL_ERROR_MESSAGES[503]
+                : data.error ||
+                PPD_LABEL_ERROR_MESSAGES[res.status] ||
+                `Failed to ${action} PPD risk prediction: ${res.status}`;
+
+        const error =
+            new Error(message);
+
+        error.status = res.status;
+        error.data = data;
+
+        throw error;
+    }
+
+    return data;
+}
+
+/**
+ * @param {string} userId
+ * @param {import("./components/type").PpdLabelVerifyRequest} body
+ * @returns {Promise<import("./components/type").PpdLabelActionResponse>}
+ */
+export function verifyPpdLabel(
+    userId,
+    { predictionScore, modelVersion }
+) {
+    return postPpdLabelAction(
+        userId,
+        "verify",
+        {
+            predictionScore,
+            modelVersion,
+        }
+    );
+}
+
+/**
+ * @param {string} userId
+ * @param {import("./components/type").PpdLabelRejectRequest} body
+ * @returns {Promise<import("./components/type").PpdLabelActionResponse>}
+ */
+export function rejectPpdLabel(
+    userId,
+    { predictionScore, modelVersion, reason }
+) {
+    const body = {
+        predictionScore,
+        modelVersion,
+    };
+
+    if (reason) {
+        body.reason = reason;
+    }
+
+    return postPpdLabelAction(
+        userId,
+        "reject",
+        body
+    );
+}

@@ -32,6 +32,9 @@ import {
     updateDoctorNote,
     deleteDoctorNote,
 } from "../api";
+import PpdLabelReview from "../components/PpdLabelReview";
+import { PpdLabelStatus } from "../components/type";
+import { formatDateTime } from "../utils/formatDateTime";
 
 // ---------- helpers ---------------------------------------------------------
 const formatDecimal = (value, digits = 1) => {
@@ -411,37 +414,38 @@ function PatientDetail() {
         }
     };
 
-    const formatNoteDateTime = (value) => {
-        if (!value) return "";
+    // ---------- PPD risk prediction review -----
 
-        const seconds =
-            value._seconds ??
-            value.seconds;
+    const handlePpdReviewSaved = (result) => {
+        setPatient((current) => ({
+            ...current,
+            risk: result.risk ?? current.risk,
+            ppdLabel: result.ppdLabel ?? current.ppdLabel,
+        }));
+    };
 
-        if (seconds != null) {
-            return new Date(
-                seconds * 1000
-            ).toLocaleString("en-CA", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-            });
-        }
+    // 409: the backend's prediction changed after this page loaded.
+    // Show the new risk; any existing review no longer applies to it,
+    // so mirror the backend's "outdated" state until the next reload.
+    const handlePpdPredictionChanged = (currentRisk) => {
+        setPatient((current) => {
+            const label = current.ppdLabel;
+            const wasReviewed =
+                label?.status === PpdLabelStatus.VERIFIED ||
+                label?.status === PpdLabelStatus.REJECTED;
 
-        const date = new Date(value);
-
-        if (Number.isNaN(date.getTime())) {
-            return "";
-        }
-
-        return date.toLocaleString("en-CA", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
+            return {
+                ...current,
+                risk: currentRisk,
+                ppdLabel: wasReviewed
+                    ? {
+                        ...label,
+                        status: PpdLabelStatus.OUTDATED,
+                        reviewedStatus: label.status,
+                        matchesCurrentPrediction: false,
+                    }
+                    : label,
+            };
         });
     };
 
@@ -530,6 +534,14 @@ function PatientDetail() {
                             health data. Review this score together with mood,
                             sleep, symptoms, and other clinical information.
                         </p>
+
+                        <PpdLabelReview
+                            userId={id}
+                            risk={risk}
+                            ppdLabel={patient.ppdLabel}
+                            onReviewSaved={handlePpdReviewSaved}
+                            onPredictionChanged={handlePpdPredictionChanged}
+                        />
                     </div>
                 </div>
 
@@ -1043,7 +1055,7 @@ function PatientDetail() {
                                                     </span> */}
 
                                                     <span className="ml-2">
-                                                        {formatNoteDateTime(
+                                                        {formatDateTime(
                                                             note.createdAt
                                                         )}
                                                     </span>

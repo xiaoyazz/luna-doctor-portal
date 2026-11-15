@@ -20,6 +20,9 @@ import {
 } from "../api";
 
 import Sparkline from "../components/Sparkline.jsx";
+import PpdLabelStatusBadge, {
+    ppdLabelNeedsReview,
+} from "../components/PpdLabelStatusBadge.jsx";
 
 
 function Dashboard() {
@@ -37,6 +40,9 @@ function Dashboard() {
 
     const [searchTerm, setSearchTerm] =
         useState("");
+
+    const [needsReviewOnly, setNeedsReviewOnly] =
+        useState(false);
 
     const navigate =
         useNavigate();
@@ -130,6 +136,12 @@ function Dashboard() {
                         modelVersion:
                             u.modelVersion ??
                             null,
+
+                        // null until the backend's GET /users
+                        // includes PPD review status
+                        ppdLabelStatus:
+                            u.ppdLabelStatus ??
+                            null,
                     }));
 
 
@@ -157,8 +169,37 @@ function Dashboard() {
     // Search
     // ======================================================
 
+    // Only offer review status UI once the backend sends it.
+    const hasReviewStatus =
+        patients.some(
+            (p) =>
+                p.ppdLabelStatus != null
+        );
+
+    const needsReviewCount =
+        patients.filter(
+            (p) =>
+                p.ppdLabelStatus != null &&
+                ppdLabelNeedsReview(
+                    p.ppdLabelStatus
+                )
+        ).length;
+
     const filtered =
         patients.filter((p) => {
+            if (
+                needsReviewOnly &&
+                hasReviewStatus &&
+                !(
+                    p.ppdLabelStatus != null &&
+                    ppdLabelNeedsReview(
+                        p.ppdLabelStatus
+                    )
+                )
+            ) {
+                return false;
+            }
+
             const term =
                 searchTerm
                     .trim()
@@ -459,6 +500,34 @@ function Dashboard() {
                 </div>
 
 
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+
+                {hasReviewStatus && (
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setNeedsReviewOnly(
+                                (v) => !v
+                            )
+                        }
+                        aria-pressed={needsReviewOnly}
+                        className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${needsReviewOnly
+                            ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                            }`}
+                    >
+                        Needs review
+                        <span
+                            className={`px-1.5 rounded-full text-xs ${needsReviewOnly
+                                ? "bg-indigo-500 text-white"
+                                : "bg-slate-100 text-slate-600"
+                                }`}
+                        >
+                            {needsReviewCount}
+                        </span>
+                    </button>
+                )}
+
                 <div className="relative w-full md:w-auto">
 
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -476,6 +545,8 @@ function Dashboard() {
 
                         className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full md:w-72 bg-white text-sm"
                     />
+
+                </div>
 
                 </div>
 
@@ -526,7 +597,9 @@ function Dashboard() {
                         </p>
 
                         <p className="mt-1 text-xs text-slate-500">
-                            No assigned patients match your search.
+                            {needsReviewOnly && hasReviewStatus
+                                ? "No assigned patients match your search and the Needs review filter."
+                                : "No assigned patients match your search."}
                         </p>
 
                     </div>
@@ -582,10 +655,8 @@ function Dashboard() {
                             </div>
 
 
-                            {/* Risk */}
-
-                            {/* Risk */}
-                            <div className="col-span-2">
+                            {/* Risk + review status */}
+                            <div className="col-span-2 flex flex-col items-start gap-1">
                                 <span
                                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${p.riskPercent == null
                                             ? "bg-slate-50 text-slate-600 border-slate-200"
@@ -600,6 +671,12 @@ function Dashboard() {
                                         ? `${p.riskPercent}%`
                                         : "No score"}
                                 </span>
+                                {p.ppdLabelStatus != null && (
+                                    <PpdLabelStatusBadge
+                                        status={p.ppdLabelStatus}
+                                        size="sm"
+                                    />
+                                )}
                             </div>
 
 

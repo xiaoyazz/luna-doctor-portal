@@ -85,4 +85,86 @@ export const RISK_LEVELS = [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH];
  * @property {AppleWatchLog[]} watchLogs
  */
 
+// -----------------------------
+// PPD risk prediction review
+// -----------------------------
+export const PpdLabelStatus = Object.freeze({
+  UNVERIFIED: "unverified",
+  VERIFIED: "verified",
+  REJECTED: "rejected",
+  OUTDATED: "outdated",
+});
+
+/**
+ * Firestore Timestamp as serialized to JSON by the backend.
+ * @typedef {Object} FirestoreTimestampJson
+ * @property {number} _seconds
+ * @property {number} _nanoseconds
+ */
+
+/**
+ * `risk` object on GET /users/:id. `score` is null when the
+ * ML service was unavailable.
+ * @typedef {Object} PatientRisk
+ * @property {number|null} score         - 0–1
+ * @property {number|null} percent       - 0–100
+ * @property {string} label
+ * @property {string|null} modelVersion
+ */
+
+/**
+ * `ppdLabel` object on GET /users/:id.
+ * `verifiedBy`/`verifiedByName`/`verifiedAt` describe the most recent
+ * review, whether it was a verification or a rejection.
+ * @typedef {Object} PpdLabel
+ * @property {"unverified"|"verified"|"rejected"|"outdated"} status
+ * @property {"verified"|"rejected"|null} reviewedStatus
+ * @property {boolean} matchesCurrentPrediction
+ * @property {string|null} verifiedBy
+ * @property {string|null} verifiedByName
+ * @property {FirestoreTimestampJson|null} verifiedAt
+ * @property {FirestoreTimestampJson|null} updatedAt
+ * @property {number|null} predictionScore
+ * @property {string|null} modelVersion
+ * @property {string|null} rejectionReason
+ */
+
+/**
+ * Body for POST /users/:id/ppd-label/verify.
+ * @typedef {Object} PpdLabelVerifyRequest
+ * @property {number} predictionScore - `risk.score` currently shown
+ * @property {string} modelVersion    - `risk.modelVersion` currently shown
+ */
+
+/**
+ * Body for POST /users/:id/ppd-label/reject.
+ * @typedef {Object} PpdLabelRejectRequest
+ * @property {number} predictionScore
+ * @property {string} modelVersion
+ * @property {string} [reason]        - optional, max 1000 chars
+ */
+
+/**
+ * 200 response from verify/reject.
+ * @typedef {Object} PpdLabelActionResponse
+ * @property {PpdLabel} ppdLabel
+ * @property {PatientRisk} risk
+ */
+
+/**
+ * 409 response from verify/reject (prediction changed since page load).
+ * @typedef {Object} PpdLabelConflictResponse
+ * @property {string} error
+ * @property {PatientRisk} currentRisk
+ */
+
+/**
+ * GET /users/:id response (fields used by the patient detail page).
+ * @typedef {Object} PatientDetailResponse
+ * @property {Object} profile
+ * @property {Object} metrics
+ * @property {PatientRisk} risk
+ * @property {PpdLabel} [ppdLabel]
+ */
+
 export const Types = {};
