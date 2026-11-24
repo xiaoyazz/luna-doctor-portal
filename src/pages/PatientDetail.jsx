@@ -27,6 +27,7 @@ import {
 } from "recharts";
 import {
     fetchUserDetail,
+    fetchCurrentDoctor,
     fetchDoctorNotes,
     createDoctorNote,
     updateDoctorNote,
@@ -111,6 +112,7 @@ function PatientDetail() {
 
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editingText, setEditingText] = useState("");
+    const [currentDoctorId, setCurrentDoctorId] = useState(null);
 
     useEffect(() => {
         async function loadPatient() {
@@ -137,8 +139,18 @@ function PatientDetail() {
             }
         }
 
+        async function loadCurrentDoctor() {
+            try {
+                const doctor = await fetchCurrentDoctor();
+                setCurrentDoctorId(doctor?.id ?? null);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
         loadPatient();
         loadNotes();
+        loadCurrentDoctor();
     }, [id]);
 
     if (loading) {
@@ -1061,6 +1073,9 @@ function PatientDetail() {
                                                     </span>
                                                 </div>
 
+                                                {currentDoctorId &&
+                                                    note.authorId ===
+                                                        currentDoctorId && (
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() =>
@@ -1084,6 +1099,7 @@ function PatientDetail() {
                                                         Delete
                                                     </button>
                                                 </div>
+                                                )}
                                             </div>
                                         </>
                                     )}
