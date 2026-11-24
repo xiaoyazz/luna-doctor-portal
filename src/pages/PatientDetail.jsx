@@ -38,6 +38,9 @@ import { PpdLabelStatus } from "../components/type";
 import { formatDateTime } from "../utils/formatDateTime";
 
 // ---------- helpers ---------------------------------------------------------
+// Notes saved by the old placeholder author before real doctor accounts existed.
+const LEGACY_NOTE_AUTHOR_IDS = ["demo-doctor-001"];
+
 const formatDecimal = (value, digits = 1) => {
     const number = Number(value);
 
@@ -130,7 +133,14 @@ function PatientDetail() {
         async function loadNotes() {
             try {
                 const notes = await fetchDoctorNotes(id);
-                setDoctorNotes(notes);
+                setDoctorNotes(
+                    notes.filter(
+                        (note) =>
+                            !LEGACY_NOTE_AUTHOR_IDS.includes(
+                                note.authorId
+                            )
+                    )
+                );
             } catch (err) {
                 console.error(err);
                 setNotesError("Failed to load clinical notes");
